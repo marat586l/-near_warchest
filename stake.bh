@@ -1,0 +1,168 @@
+#!/bin/bash
+
+# reduce to 140% of next_price ==========================================================
+function reduce_stake  {                       
+ adapt_amount=$((($stake_int-$next_price_int*$numcorr/100)*1000))
+ #echo "$adapt_amount"
+ echo ".............................................................................."
+ echo "Current stake will reduce for $adapt_amount"
+ change " unstake "
+       
+}
+# increase to 140% of next_price  =========================================================
+function increase_stake  {
+ adapt_amount=$((($next_price_int*$numcorr/100-$stake_int)*1000))
+ echo "..............................................................."
+ echo "Current stake will increase on $adapt_amount"
+ change " stake "
+}
+# idiotizm =================================================================================
+function crezi_bash1    { 
+# echo "$1"
+echo `expr index "$1" "$2"` > var7    #comma
+position=$(cat var7)
+#echo "$position"
+position=$(($position-1))
+echo ${1:0:position}  > var7           #inter
+stringz=$(cat var7)
+}
+#===========================================================================================
+function change       {
+  tmp="000000000000000000000000"
+  adapt_amount="$adapt_amount$tmp"
+   
+  c1="near call "
+  c2="'{\"amount\": \""
+  c3="\"}' --accountId "    
+                                       # adapt_amount="1000000000000000000000000"
+  #echo "$c1$name$1$c2$adapt_amount$c3$accaunt" 
+  eval "$c1$name$1$c2$adapt_amount$c3$accaunt"
+}
+function change_block_for_check   {        #===============================================
+ block_for_check=$(($epoch_start_height+10000+10000))
+ echo "$block_for_check" > param
+ echo -e "Next check of stake will begin on block " "$block_for_check" "\n"
+}
+function del_file    {     #==========================================================
+i=1
+var="var"
+until [ $i -gt 17 ]
+do
+ file=$var$i
+ #echo "$file"
+ if [[ -e $file ]]
+  then
+  rm "$file"
+ fi
+ (( i++ ))
+ if [[ -e "cur_price" ]]
+ then
+ rm "cur_price"
+ fi
+done
+}  
+#====================================================================================
+#====================================================================================
+
+slp="sleep "
+num="600"
+if ! [ -f "param"  ]    # the file not exists
+ then
+  #echo " NOOOO "
+  echo "0" > param
+fi
+block_for_check=$(cat param)
+
+declare -a a
+i=1
+while read a[i]  
+ do
+ i=$((i+1))
+done < config                                                      
+#exit
+name=${a[1]}
+accaunt=${a[2]}
+nummin=${a[3]}
+nummax=${a[4]}
+numcorr=${a[5]}
+echo -e "\n"
+
+answer () {
+while read num; do
+echo "$num"
+if [[ num -ge 10 && num -le 3600 ]]
+ then
+# return num
+ break
+else 
+ printf "Error in the number, repeat pls!\n "
+fi
+done
+}
+
+trap 'echo "Script is finished"; del_file; exit 1' EXIT
+trap 'printf "\nEnter the number from 10 to 3600 \n"; answer ' SIGQUIT
+
+
+while true      ############################ infinite cycle ############################################################
+do
+ latest_block_height=$(curl https://rpc.betanet.near.org/status | jq .sync_info.latest_block_height) 
+ epoch_start_height=$(curl -d '{"jsonrpc": "2.0", "method": "validators", "id": "dontcare", "params": [null]}' -H 'Content-Type: application/json' https://rpc.betanet.near.org | jq .result.epoch_start_height) 
+ 
+ echo -e "\n"
+ zdump EST
+
+ if [ "$latest_block_height" -gt "$block_for_check" ]     #check the pull only the first time and thru 2 epoch after stake/unstake command
+  then
+  near validators current | awk '/'$name'/ {print $2 > "var2"; print $4 > "var4"; print $6 > "var6"; print $10 > "var10"; print $12 > "var12"} /price/ {print substr($6, 1, length($6)-2) > "cur_price"}' 
+  #echo "$?"
+  next_price=$(near validators next | awk '/price/ {print substr($7, 1, length($7)-2)}')
+  val_id=$(cat var2)
+  stake=$(cat var4)
+  seats=$(cat var6)
+  prod=$(cat var10)
+  expect=$(cat var12)
+  cur_price=$(cat cur_price)
+ 
+  if [ "$val_id" != "$name" ]
+   then
+   echo " Validator $name absent in list"
+   del_file
+   exit
+  fi 
+
+  echo -e "=============================================================="
+  echo -e "Validator ID..."  "$val_id"  "\nStake..."  "$stake" "\nSeats..." "$seats" "\nProduced blocks..." "$prod" "\nExpected blocks..." "$expect"
+ 
+  echo "Latest block height"..."$latest_block_height"
+  echo "Epoch start height"..."$epoch_start_height"
+  echo "$((10000-$latest_block_height+$epoch_start_height))" "blocks are left in the current epoch"
+
+  crezi_bash1 $next_price "," 
+  next_price_int=$stringz
+  crezi_bash1 $stake "," 
+  stake_int=$stringz
+
+                  ## stake_int=30                 
+  if [ $stake_int -gt $(($next_price_int*$nummax/100)) ]   
+   then 
+    reduce_stake
+    change_block_for_check
+   elif [ $stake_int -lt $(($next_price_int*(200-$nummin)/100)) ]
+   then 
+    increase_stake
+    change_block_for_check
+   else 
+   echo "Current stake is OK"
+  fi
+  del_file
+
+ else 
+  echo -e "=============================================================="
+  echo -e "Latest block height"..."$latest_block_height"
+  echo "Check will again on block" "$block_for_check"
+  echo "$((10000-$latest_block_height+$epoch_start_height))" "blocks are left in the current epoch"
+ fi
+ eval "$slp$num"
+done                               ###############################################################################
+

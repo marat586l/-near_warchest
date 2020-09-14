@@ -1,0 +1,17 @@
+This script can dynamically adjust the locked balance of your staking pool, and maintain one seat.
+Additionally, it defines the main parameters of the validator такие как seat prices, produced blocks, expected blocks,
+gets the current block height and the beginning of the current epoch.
+This script run from the terminal where the NEAR node is installed and the validator contract is deployed. To run the script, 
+you need to create a directory where to put the stake.bh file, containing the script and config file, where it is written: 
+the pool name POOL_ID, the name of the master account WARCHEST_ID, the value that locked balance should not exceed, the value below
+which locked balance should not fall, and the value that locked balance should be set to if it is greater or less than these values. 
+By default, 180%, 120%, 140% are recorded, respectively, which will be calculated from next seat pric. These values can be changed.
+After running, the script determines the main parameters and, if the balance is higher or lower than the set values, issues the command
+stake/unstake, respectively. Since the actual decrease/increase in the balance occurs 2 epochs after the command is executed, the script
+remembers the block number from which the second epoch will start and re-starts a full check starting from this block. Up to this point 
+the script will only identify and print the basic parameters.
+Before start script first time needs execute the command chmod ugo+x ./stake.bh. The script is run by a command ./stake.bh from the directory 
+where it is located.
+The script action is repeated every 30 minutes. You can change this value if you want pressing Ctrl-\.
+If you press Ctrl-c, the script writes "Script is finished" and stops working
+
